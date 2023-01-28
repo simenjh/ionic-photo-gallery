@@ -16,6 +16,8 @@ export interface UserPhoto {
   webViewPath?: string;
 }
 
+const PHOTO_STORAGE = "photos";
+
 export function usePhotoGallery() {
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
 
@@ -23,20 +25,60 @@ export function usePhotoGallery() {
     photo: Photo,
     fileName: string
   ): Promise<UserPhoto> => {
-    const base64Data = await base64FromPath(photo.webPath!);
+    let base64Data: string;
+    // "hybrid" will detect Cordova or Capacitor;
+    if (isPlatform("hybrid")) {
+      const file = await Filesystem.readFile({
+        path: photo.path!,
+      });
+      base64Data = file.data;
+    } else {
+      base64Data = await base64FromPath(photo.webPath!);
+    }
     const savedFile = await Filesystem.writeFile({
       path: fileName,
       data: base64Data,
       directory: Directory.Data,
     });
 
-    // Use webPath to display the new image instead of base64 since it's
-    // already loaded into memory
-    return {
-      filePath: fileName,
-      webViewPath: photo.webPath,
-    };
+    if (isPlatform("hybrid")) {
+      // Display the new image by rewriting the 'file://' path to HTTP
+      // Details: https://ionicframework.com/docs/building/webview#file-protocol
+      return {
+        filePath: savedFile.uri,
+        webViewPath: Capacitor.convertFileSrc(savedFile.uri),
+      };
+    } else {
+      // Use webPath to display the new image instead of base64 since it's
+      // already loaded into memory
+      return {
+        filePath: fileName,
+        webViewPath: photo.webPath,
+      };
+    }
   };
+
+  useEffect(() => {
+    const loadSaved = async () => {
+      const { value } = await Preferences.get({ key: PHOTO_STORAGE });
+
+      const photosInPreferences = (
+        value ? JSON.parse(value) : []
+      ) as UserPhoto[];
+      // If running on the web
+      if (!isPlatform("hybrid")) {
+        for (let photo of photosInPreferences) {
+          const file = await Filesystem.readFile({
+            path: photo.filePath,
+            directory: Directory.Data,
+          });
+          photo.webViewPath = `data:image/jpeg;base64,${file.data}`;
+        }
+      }
+      setPhotos(photosInPreferences);
+    };
+    loadSaved();
+  }, []);
 
   const takePhoto = async () => {
     const photo = await Camera.getPhoto({
@@ -48,6 +90,7 @@ export function usePhotoGallery() {
     const fileName = new Date().getTime() + ".jpeg";
     const savedFileImage = await savePicture(photo, fileName);
     const newPhotos = [savedFileImage, ...photos];
+    Preferences.set({ key: PHOTO_STORAGE, value: JSON.stringify(newPhotos) });
     setPhotos(newPhotos);
   };
 
