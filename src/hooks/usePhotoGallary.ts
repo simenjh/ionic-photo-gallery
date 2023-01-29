@@ -58,6 +58,21 @@ export function usePhotoGallery() {
     }
   };
 
+  const deletePhoto = async (photo: UserPhoto) => {
+    // Remove this photo from the Photos reference data array
+    const newPhotos = photos.filter((p) => p.filePath !== photo.filePath);
+
+    // Update photos array cache by overwriting the existing photo array
+    Preferences.set({ key: PHOTO_STORAGE, value: JSON.stringify(newPhotos) });
+
+    // delete photo file from filesystem
+    const fileName = photo.filePath.substring(
+      photo.filePath.lastIndexOf("/") + 1
+    );
+    await Filesystem.deleteFile({ path: fileName, directory: Directory.Data });
+    setPhotos(newPhotos);
+  };
+
   useEffect(() => {
     const loadSaved = async () => {
       const { value } = await Preferences.get({ key: PHOTO_STORAGE });
@@ -94,7 +109,7 @@ export function usePhotoGallery() {
     setPhotos(newPhotos);
   };
 
-  return { photos, takePhoto };
+  return { photos, takePhoto, deletePhoto };
 }
 
 export async function base64FromPath(path: string): Promise<string> {

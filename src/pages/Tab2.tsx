@@ -18,7 +18,8 @@ import { usePhotoGallery, UserPhoto } from "../hooks/usePhotoGallary";
 import { useState } from "react";
 
 const Tab2: React.FC = () => {
-  const { photos, takePhoto } = usePhotoGallery();
+  const { photos, takePhoto, deletePhoto } = usePhotoGallery();
+  const [photoToDelete, setPhotoToDelete] = useState<UserPhoto>();
 
   return (
     <IonPage>
@@ -32,7 +33,10 @@ const Tab2: React.FC = () => {
           <IonRow>
             {photos.map((photo, index) => (
               <IonCol size="6" key={index}>
-                <IonImg src={photo.webViewPath} />
+                <IonImg
+                  src={photo.webViewPath}
+                  onClick={() => setPhotoToDelete(photo)}
+                />
               </IonCol>
             ))}
           </IonRow>
@@ -42,6 +46,28 @@ const Tab2: React.FC = () => {
             <IonIcon icon={camera}></IonIcon>
           </IonFabButton>
         </IonFab>
+        <IonActionSheet
+          isOpen={!!photoToDelete}
+          buttons={[
+            {
+              text: "Delete",
+              role: "destructive",
+              icon: trash,
+              handler: () => {
+                if (photoToDelete) {
+                  deletePhoto(photoToDelete);
+                  setPhotoToDelete(undefined);
+                }
+              },
+            },
+            {
+              text: "Cancel",
+              icon: close,
+              role: "cancel",
+            },
+          ]}
+          onDidDismiss={() => setPhotoToDelete(undefined)}
+        />
       </IonContent>
     </IonPage>
   );
